@@ -1,0 +1,7 @@
+.vs/
+bin/
+**/x64/
+obj/
+*.vcxproj.user
+*.csproj.user
+shaders/*.h
