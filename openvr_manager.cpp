@@ -1,11 +1,9 @@
+
 #include "pch.h"
 #include "openvr_manager.h"
-#include <log.h>
-#include "layer.h"
+#include "logging.h"
 
 
-using namespace steamvr_passthrough;
-using namespace steamvr_passthrough::log;
 
 
 OpenVRManager::OpenVRManager()

@@ -1,12 +1,12 @@
+
 #pragma once
+
 #include <thread>
 #include <mutex>
 #include <atomic>
-#include <xr_linear.h>
-#include "layer.h"
 #include "passthrough_renderer.h"
 #include "openvr_manager.h"
-
+#include "shared_structs.h"
 
 enum ETrackedCameraFrameType
 {
@@ -23,7 +23,7 @@ class CameraManager
 {
 public:
 
-	CameraManager(std::shared_ptr<IPassthroughRenderer> renderer, ERenderAPI renderAPI, std::shared_ptr<ConfigManager> configManager, std::shared_ptr<OpenVRManager> openVRManager);
+	CameraManager(std::shared_ptr<PassthroughRenderer> renderer, std::shared_ptr<ConfigManager> configManager, std::shared_ptr<OpenVRManager> openVRManager);
 	~CameraManager();
 
 	bool InitCamera();
@@ -32,13 +32,13 @@ public:
 	void GetFrameSize(uint32_t& width, uint32_t& height, uint32_t& bufferSize);
 	void UpdateStaticCameraParameters();
 	bool GetCameraFrame(std::shared_ptr<CameraFrame>& frame);
-	void CalculateFrameProjection(std::shared_ptr<CameraFrame>& frame, const XrCompositionLayerProjection& layer, const XrTime& displayTime, const XrReferenceSpaceCreateInfo& refSpaceInfo);
+	void CalculateFrameProjection(std::shared_ptr<CameraFrame>& frame, RenderFrame& renderFrame);
 
 private:
 	void ServeFrames();
-	void GetTrackedCameraEyePoses(XrMatrix4x4f& LeftPose, XrMatrix4x4f& RightPose);
-	XrMatrix4x4f GetHMDMVPMatrix(const ERenderEye eye, const XrCompositionLayerProjection& layer, const XrReferenceSpaceCreateInfo& refSpaceInfo);
-	void CalculateFrameProjectionForEye(const ERenderEye eye, std::shared_ptr<CameraFrame>& frame, const XrCompositionLayerProjection& layer, const XrReferenceSpaceCreateInfo& refSpaceInfo);
+	void GetTrackedCameraEyePoses(Matrix4& LeftPose, Matrix4& RightPose);
+	Matrix4 GetHMDViewToTrackingMatrix(const ERenderEye eye);
+	void CalculateFrameProjectionForEye(const ERenderEye eye, std::shared_ptr<CameraFrame>& frame, RenderFrame& renderFrame);
 
 	std::shared_ptr<ConfigManager> m_configManager;
 	std::shared_ptr<OpenVRManager> m_openVRManager;
@@ -52,8 +52,7 @@ private:
 	float m_projectionDistanceFar;
 	float m_projectionDistanceNear;
 
-	std::weak_ptr<IPassthroughRenderer> m_renderer;
-	ERenderAPI m_renderAPI;
+	std::weak_ptr<PassthroughRenderer> m_renderer;
 	std::thread m_serveThread;
 	std::atomic_bool m_bRunThread = true;
 	std::mutex m_serveMutex;
@@ -67,15 +66,15 @@ private:
 	vr::TrackedCameraHandle_t m_cameraHandle;
 	EStereoFrameLayout m_frameLayout;
 
-	XrMatrix4x4f m_rawHMDProjectionLeft{};
-	XrMatrix4x4f m_rawHMDViewLeft{};
-	XrMatrix4x4f m_rawHMDProjectionRight{};
-	XrMatrix4x4f m_rawHMDViewRight{};
+	Matrix4 m_rawHMDProjectionLeft{};
+	Matrix4 m_rawHMDViewLeft{};
+	Matrix4 m_rawHMDProjectionRight{};
+	Matrix4 m_rawHMDViewRight{};
 
-	XrMatrix4x4f m_cameraProjectionInvFarLeft{};
-	XrMatrix4x4f m_cameraProjectionInvFarRight{};
+	Matrix4 m_cameraProjectionInvFarLeft{};
+	Matrix4 m_cameraProjectionInvFarRight{};
 
-	XrMatrix4x4f m_cameraLeftToHMDPose{};
-	XrMatrix4x4f m_cameraLeftToRightPose{};
+	Matrix4 m_cameraLeftToHMDPose{};
+	Matrix4 m_cameraLeftToRightPose{};
 };
 

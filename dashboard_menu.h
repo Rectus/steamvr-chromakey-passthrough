@@ -1,9 +1,7 @@
+
 #pragma once
 
 #include <thread>
-#include <condition_variable>
-
-#include "layer.h"
 #include "config_manager.h"
 #include "openvr_manager.h"
 
@@ -11,7 +9,7 @@
 using Microsoft::WRL::ComPtr;
 
 
-#define DASHBOARD_OVERLAY_KEY "XR_APILAYER_NOVENDOR_steamvr_passthrough.{}.dashboard"
+#define DASHBOARD_OVERLAY_KEY "steamvr_chromakey_passthrough.{}.dashboard"
 
 #define OVERLAY_RES_WIDTH 800
 #define OVERLAY_RES_HEIGHT 420
@@ -20,20 +18,12 @@ using Microsoft::WRL::ComPtr;
 
 struct MenuDisplayValues
 {
-	bool bSessionActive = false;
-	ERenderAPI renderAPI = None;
-	std::string currentApplication;
 	int frameBufferWidth = 0;
 	int frameBufferHeight = 0;
-	XrCompositionLayerFlags frameBufferFlags = 0;
-	int64_t frameBufferFormat = 0;
+
 	float frameToRenderLatencyMS = 0.0f;
 	float frameToPhotonsLatencyMS = 0.0f;
 	float renderTimeMS = 0.0f;
-
-
-	bool bCorePassthroughActive = false;
-	int CoreCurrentMode = 0;
 };
 
 
@@ -41,11 +31,24 @@ class DashboardMenu
 {
 public:
 
-	DashboardMenu(HMODULE dllModule, std::shared_ptr<ConfigManager> configManager, std::shared_ptr<OpenVRManager> openVRManager);
+	DashboardMenu(std::shared_ptr<ConfigManager> configManager, std::shared_ptr<OpenVRManager> openVRManager);
 
 	~DashboardMenu();
 	
 	MenuDisplayValues& GetDisplayValues() { return m_displayValues; }
+
+	inline bool IsPassthroughEnabled() const { return m_bPassthroughEnabled; }
+	inline bool IsShutdownSignaled() const { return m_bSignalShutdown; }
+
+	inline bool IsCaptureSignaled()
+	{
+		if (m_bSignalCapture)
+		{
+			m_bSignalCapture = false;
+			return true;
+		}
+		return false;
+	}
 
 private:
 
@@ -76,5 +79,9 @@ private:
 
 	bool m_bMenuIsVisible;
 	MenuDisplayValues m_displayValues;
+
+	bool m_bPassthroughEnabled;
+	bool m_bSignalShutdown;
+	bool m_bSignalCapture;
 };
 

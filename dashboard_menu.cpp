@@ -1,23 +1,23 @@
+
 #include "pch.h"
 #include "dashboard_menu.h"
-#include <log.h>
-#include "imgui.h"
-#include "imgui_internal.h"
-#include "imgui_impl_dx11.h"
-
-using namespace steamvr_passthrough;
-using namespace steamvr_passthrough::log;
+#include "logging.h"
+//#include "imgui.h"
+//#include "imgui_internal.h"
+//#include "imgui_impl_dx11.h"
 
 
-DashboardMenu::DashboardMenu(HMODULE dllModule, std::shared_ptr<ConfigManager> configManager, std::shared_ptr<OpenVRManager> openVRManager)
-	: m_dllModule(dllModule)
-	, m_configManager(configManager)
+
+DashboardMenu::DashboardMenu(std::shared_ptr<ConfigManager> configManager, std::shared_ptr<OpenVRManager> openVRManager)
+	: m_configManager(configManager)
 	, m_openVRManager(openVRManager)
 	, m_overlayHandle(vr::k_ulOverlayHandleInvalid)
 	, m_thumbnailHandle(vr::k_ulOverlayHandleInvalid)
 	, m_bMenuIsVisible(false)
+	, m_bSignalShutdown(false)
 	, m_displayValues()
 {
+	m_bPassthroughEnabled = configManager->GetConfig_Main().EnablePassthoughOnLaunch;
 	m_bRunThread = true;
 	m_menuThread = std::thread(&DashboardMenu::RunThread, this);
 }
@@ -65,6 +65,7 @@ void DashboardMenu::RunThread()
 	{
 		TickMenu();
 
+		//std::this_thread::sleep_for(std::chrono::milliseconds(11));
 		vrOverlay->WaitFrameSync(100);
 	}
 
@@ -114,7 +115,6 @@ void DashboardMenu::TickMenu()
 	}
 
 	Config_Main& mainConfig = m_configManager->GetConfig_Main();
-	Config_Core& coreConfig = m_configManager->GetConfig_Core();
 
 	ImGuiIO& io = ImGui::GetIO();
 
@@ -132,58 +132,41 @@ void DashboardMenu::TickMenu()
 
 	if (ImGui::CollapsingHeader("Session"), ImGuiTreeNodeFlags_DefaultOpen)
 	{
-		if (m_displayValues.bSessionActive)
-		{
-			ImGui::Text("Session: Active");
-		}
-		else
-		{
-			ImGui::Text("Session: Inactive");
-		}
+		ImGui::Text("Passthrough:");
 
-		switch(m_displayValues.renderAPI)
-		{
-		case DirectX11:
-			ImGui::Text("Render API: DirectX 11");
-			break;
-		case DirectX12:
-			ImGui::Text("Render API: DirectX 12");
-			break;
-		default:
-			ImGui::Text("Render API: None");
-		}
+		ImGui::BeginGroup();
 
-		ImGui::Text("Application: %s", m_displayValues.currentApplication.c_str());
+		bool bCacheEnabledVal = m_bPassthroughEnabled;
+
+		if (bCacheEnabledVal) { ImGui::BeginDisabled(); }
+		if (ImGui::Button("On"))
+		{
+			m_bPassthroughEnabled = true;
+		}
+		if (bCacheEnabledVal) { ImGui::EndDisabled(); }
+
+		ImGui::SameLine();
+
+		if (!bCacheEnabledVal) { ImGui::BeginDisabled(); }
+		if (ImGui::Button("Off"))
+		{
+			m_bPassthroughEnabled = false;
+		}
+		if (!bCacheEnabledVal) { ImGui::EndDisabled(); }
+		ImGui::EndGroup();
+
+
 		ImGui::Text("Resolution: %i x %i", m_displayValues.frameBufferWidth, m_displayValues.frameBufferHeight);
-		if (m_displayValues.frameBufferFlags & XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT)
-		{
-			if (m_displayValues.frameBufferFlags & XR_COMPOSITION_LAYER_UNPREMULTIPLIED_ALPHA_BIT)
-			{
-				ImGui::Text("Flags: Unpremultiplied alpha");
-			}
-			else
-			{
-				ImGui::Text("Flags: Premultiplied alpha");
-			}
-		}
-		else
-		{
-			ImGui::Text("Flags: No alpha");
-		}
-
-		ImGui::Text("Buffer format: %li", m_displayValues.frameBufferFormat);
-
 		ImGui::Text("Exposure to render latency: %.1fms", m_displayValues.frameToRenderLatencyMS);
 		ImGui::Text("Exposure to photons latency: %.1fms", m_displayValues.frameToPhotonsLatencyMS);
 		ImGui::Text("Passthrough CPU render duration: %.2fms", m_displayValues.renderTimeMS);
 	}
 
-	
 
 	if (ImGui::CollapsingHeader("Main Settings"), ImGuiTreeNodeFlags_DefaultOpen)
 	{
 		ImGui::BeginGroup();
-		ImGui::Checkbox("Enable Passthrough", &mainConfig.EnablePassthough);
+		ImGui::Checkbox("Start on launch", &mainConfig.EnablePassthoughOnLaunch);
 		ImGui::Checkbox("Show Test Image", &mainConfig.ShowTestImage);
 		ImGui::Separator();
 
@@ -207,100 +190,60 @@ void DashboardMenu::TickMenu()
 		m_configManager->ResetToDefaults();
 	}
 
-	ImGui::EndChild();
 	ImGui::SameLine();
 
-	ImGui::BeginChild("Core Pane", ImVec2(OVERLAY_RES_WIDTH * 0.25f, ImGui::GetContentRegionAvail().y));
-	if (ImGui::CollapsingHeader("OpenXR Core"), ImGuiTreeNodeFlags_DefaultOpen)
+	if (ImGui::Button("Capture Frame"))
 	{
-		if (m_displayValues.bCorePassthroughActive)
-		{
-			ImGui::Text("Core passthrough: Active");
-		}
-		else
-		{
-			ImGui::Text("Core passthrough: Inactive");
-		}
-
-		ImGui::Text("Application requested mode: ");
-		if (m_displayValues.CoreCurrentMode == 3) { ImGui::Text("Alpha Blend"); }
-		else if (m_displayValues.CoreCurrentMode == 2) { ImGui::Text("Additive"); }
-		else if (m_displayValues.CoreCurrentMode == 1) { ImGui::Text("Opaque"); }
-		else { ImGui::Text("Unknown"); }
-
-		ImGui::Separator();
-
-		ImGui::Checkbox("Enable###CoreEnable", &coreConfig.CorePassthroughEnable);
-		ImGui::Separator();
-
-		ImGui::BeginGroup();
-		ImGui::Text("Blend Modes");
-		ImGui::Checkbox("Alpha Blend###CoreAlpha", &coreConfig.CoreAlphaBlend);
-		ImGui::Checkbox("Additive###CoreAdditive", &coreConfig.CoreAdditive);
-		ImGui::EndGroup();
-
-		ImGui::Separator();
-
-		ImGui::BeginGroup();
-		ImGui::Text("Preferred Mode");
-		if (ImGui::RadioButton("Alpha Blend###CorePref3", coreConfig.CorePreferredMode == 3))
-		{
-			coreConfig.CorePreferredMode = 3;
-		}
-		if (ImGui::RadioButton("Additive###CorePref2", coreConfig.CorePreferredMode == 2))
-		{
-			coreConfig.CorePreferredMode = 2;
-		}
-		if (ImGui::RadioButton("Opaque###CorePref1", coreConfig.CorePreferredMode == 1))
-		{
-			coreConfig.CorePreferredMode = 1;
-		}
-		ImGui::EndGroup();
+		m_bSignalCapture = true;
 	}
 
+	ImGui::SameLine();
+
+	if (ImGui::Button("Shut Down"))
+	{
+		m_bSignalShutdown = true;
+	}
+	
+
 	ImGui::EndChild();
 	ImGui::SameLine();
 
-	ImGui::BeginChild("Overrides Pane", ImVec2(0, ImGui::GetContentRegionAvail().y));
-	if (ImGui::CollapsingHeader("Overrides"), ImGuiTreeNodeFlags_DefaultOpen)
+	ImGui::BeginChild("Blending", ImVec2(0, ImGui::GetContentRegionAvail().y));
+	if (ImGui::CollapsingHeader("Blending"), ImGuiTreeNodeFlags_DefaultOpen)
 	{
 		ImGui::BeginGroup();
-		ImGui::Checkbox("Force Passthough Mode", &coreConfig.CoreForcePassthrough);
 
 		ImGui::BeginGroup();
-		if (ImGui::RadioButton("Alpha Blend###CoreForce3", coreConfig.CoreForceMode == 3))
+		if (ImGui::RadioButton("Masked with chroma key", mainConfig.PassthroughMode == Masked))
 		{
-			coreConfig.CoreForceMode = 3;
+			mainConfig.PassthroughMode = Masked;
 		}
-		if (ImGui::RadioButton("Additive###CoreForcef2", coreConfig.CoreForceMode == 2))
+		if (ImGui::RadioButton("Additive", mainConfig.PassthroughMode == Additive))
 		{
-			coreConfig.CoreForceMode = 2;
+			mainConfig.PassthroughMode = Additive;
 		}
-		if (ImGui::RadioButton("Opaque###Coreforce1", coreConfig.CoreForceMode == 1))
+		if (ImGui::RadioButton("Opaque", mainConfig.PassthroughMode == Opaque))
 		{
-			coreConfig.CoreForceMode = 1;
+			mainConfig.PassthroughMode = Opaque;
 		}
-		if (ImGui::RadioButton("Masked###Coreforce0", coreConfig.CoreForceMode == 0))
-		{
-			coreConfig.CoreForceMode = 0;
-		}
+
 		ImGui::EndGroup();
 		ImGui::Separator();
 		ImGui::Text("Masked Croma Key Settings");
-		ScrollableSlider("Chroma Range", &coreConfig.CoreForceMaskedFractionChroma, 0.0f, 1.0f, "%.2f", 0.01f);
-		ScrollableSlider("Luma Range", &coreConfig.CoreForceMaskedFractionLuma, 0.0f, 1.0f, "%.2f", 0.01f);
-		ScrollableSlider("Smoothing", &coreConfig.CoreForceMaskedSmoothing, 0.01f, 0.2f, "%.3f", 0.005f);
-		ImGui::ColorEdit3("Key", coreConfig.CoreForceMaskedKeyColor);
+		ScrollableSlider("Chroma Range", &mainConfig.MaskedFractionChroma, 0.0f, 1.0f, "%.2f", 0.01f);
+		ScrollableSlider("Luma Range", &mainConfig.MaskedFractionLuma, 0.0f, 1.0f, "%.2f", 0.01f);
+		ScrollableSlider("Smoothing", &mainConfig.MaskedSmoothing, 0.01f, 0.2f, "%.3f", 0.005f);
+		ImGui::ColorEdit3("Key", mainConfig.MaskedKeyColor);
 
 		ImGui::BeginGroup();
 		ImGui::Text("Chroma Key Source");
-		if (ImGui::RadioButton("Application", !coreConfig.CoreForceMaskedUseCameraImage))
+		if (ImGui::RadioButton("VR View", !mainConfig.MaskedUseCameraImage))
 		{
-			coreConfig.CoreForceMaskedUseCameraImage = false;
+			mainConfig.MaskedUseCameraImage = false;
 		}
-		if (ImGui::RadioButton("Passthrough Camera", coreConfig.CoreForceMaskedUseCameraImage))
+		if (ImGui::RadioButton("Passthrough Camera", mainConfig.MaskedUseCameraImage))
 		{
-			coreConfig.CoreForceMaskedUseCameraImage = true;
+			mainConfig.MaskedUseCameraImage = true;
 		}
 		ImGui::EndGroup();
 
@@ -338,7 +281,7 @@ void DashboardMenu::TickMenu()
 	vr::EVROverlayError error = m_openVRManager->GetVROverlay()->SetOverlayTexture(m_overlayHandle, &texture);
 	if (error != vr::VROverlayError_None)
 	{
-		ErrorLog("SteamVR had an error on updating overlay (%d)\n", error);
+		ErrorLog("SteamVR had an error on updating dashboard overlay (%d)\n", error);
 	}
 }
 

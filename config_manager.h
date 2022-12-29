@@ -1,9 +1,13 @@
+
 #pragma once
+
 #include "SimpleIni.h"
+#include "shared_structs.h"
+
 
 struct Config_Main
 {
-	bool EnablePassthough = true;
+	bool EnablePassthoughOnLaunch = true;
 	bool ShowTestImage = false;
 	float PassthroughOpacity = 1.0f;
 	float ProjectionDistanceFar = 5.0f;
@@ -13,24 +17,15 @@ struct Config_Main
 	float Contrast = 1.0f;
 	float Saturation = 1.0f;
 
-	bool RequireSteamVRRuntime = true;
+	EPassthroughBlendMode PassthroughMode;
+
+	float MaskedFractionChroma = 0.2f;
+	float MaskedFractionLuma = 0.4f;
+	float MaskedSmoothing = 0.01f;
+	float MaskedKeyColor[3] = { 0 ,0 ,0 };
+	bool MaskedUseCameraImage = false;
 };
 
-// Configuration for core-spec passthough
-struct Config_Core
-{
-	bool CorePassthroughEnable = true;
-	bool CoreAlphaBlend = true;
-	bool CoreAdditive = true;
-	int CorePreferredMode = 3;
-	bool CoreForcePassthrough = false;
-	int CoreForceMode = 1;
-	float CoreForceMaskedFractionChroma = 0.2f;
-	float CoreForceMaskedFractionLuma = 0.4f;
-	float CoreForceMaskedSmoothing = 0.01f;
-	float CoreForceMaskedKeyColor[3] = { 0 ,0 ,0 };
-	bool CoreForceMaskedUseCameraImage = false;
-};
 
 
 
@@ -46,22 +41,18 @@ public:
 	void ResetToDefaults();
 
 	Config_Main& GetConfig_Main() { return m_configMain; }
-	Config_Core& GetConfig_Core() { return m_configCore; }
 
 
 private:
 	void UpdateConfigFile();
 
 	void ParseConfig_Main();
-	void ParseConfig_Core();
 	void UpdateConfig_Main();
-	void UpdateConfig_Core();
 
 	std::wstring m_configFile;
 	CSimpleIniA m_iniData;
 	bool m_bConfigUpdated;
 
 	Config_Main m_configMain;
-	Config_Core m_configCore;
 };
 

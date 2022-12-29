@@ -36,7 +36,7 @@ cbuffer psMaskedConstantBuffer : register(b2)
 
 SamplerState g_SamplerState : register(s0);
 Texture2D g_CameraTexture : register(t0);
-Texture2D g_BlendMask : register(t1);
+Texture2D g_CompositorTexture : register(t1);
 
 
 float4 main(VS_OUTPUT input) : SV_TARGET
@@ -50,10 +50,31 @@ float4 main(VS_OUTPUT input) : SV_TARGET
 	// Clamp to half of the frame texture and add the right eye offset.
 	outUvs = clamp(outUvs, float2(0.0, 0.0), float2(0.5, 1.0)) + g_uvOffset;
 
-	float4 cameraColor = g_CameraTexture.Sample(g_SamplerState, outUvs.xy);
 
-	float alpha = g_BlendMask.Sample(g_SamplerState, input.originalUVCoords.xy).x;
-	alpha = saturate((1.0 - alpha) * g_opacity);
+	float3 cameraColor = g_CameraTexture.Sample(g_SamplerState, outUvs).xyz;
+
+	float3 maskColor;
+
+	if (g_bMaskedUseCamera)
+	{
+		maskColor = cameraColor;
+	}
+	else
+	{
+		maskColor = g_CompositorTexture.Sample(g_SamplerState, input.originalUVCoords).xyz;
+	}
+
+
+	float3 difference = LinearRGBtoLAB_D65(maskColor) - LinearRGBtoLAB_D65(g_maskedKey);
+
+	float2 distChromaSqr = pow(difference.yz, 2);
+	float fracChromaSqr = pow(g_maskedFracChroma, 2);
+
+	float distChroma = smoothstep(fracChromaSqr, fracChromaSqr + pow(g_maskedSmooth, 2), (distChromaSqr.x + distChromaSqr.y));
+	float distLuma = smoothstep(g_maskedFracLuma, g_maskedFracLuma + g_maskedSmooth, abs(difference.x));
+
+	float alpha = saturate((1.0 - max(distChroma, distLuma)) * g_opacity);
+
 
 	if (g_bDoColorAdjustment)
 	{
@@ -63,8 +84,9 @@ float4 main(VS_OUTPUT input) : SV_TARGET
 		float LBis = clamp(LPrime + g_brightness, 0.0, 100.0);
 		float2 ab = labColor.yz * g_saturation;
 
-		cameraColor = float4(LABtoLinearRGB_D65(float3(LBis, ab.xy)).xyz, cameraColor.a);
+		cameraColor = LABtoLinearRGB_D65(float3(LBis, ab.xy));
 	}
 
-	return float4(cameraColor.xyz, alpha);
+	// Premultiply alpha.
+	return float4(cameraColor * alpha, alpha);
 }

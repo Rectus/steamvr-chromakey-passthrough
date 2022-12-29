@@ -1,9 +1,8 @@
+
 #include "pch.h"
 #include "config_manager.h"
-#include <log.h>
+#include "logging.h"
 
-using namespace steamvr_passthrough;
-using namespace steamvr_passthrough::log;
 
 ConfigManager::ConfigManager(std::wstring configFile)
 	: m_configFile(configFile)
@@ -29,7 +28,6 @@ void ConfigManager::ReadConfigFile()
 	else
 	{
 		ParseConfig_Main();
-		ParseConfig_Core();
 	}
 	m_bConfigUpdated = false;
 }
@@ -37,7 +35,6 @@ void ConfigManager::ReadConfigFile()
 void ConfigManager::UpdateConfigFile()
 {
 	UpdateConfig_Main();
-	UpdateConfig_Core();
 
 	SI_Error result = m_iniData.SaveFile(m_configFile.c_str());
 	if (result < 0)
@@ -64,13 +61,12 @@ void ConfigManager::DispatchUpdate()
 void ConfigManager::ResetToDefaults()
 {
 	m_configMain = Config_Main();
-	m_configCore = Config_Core();
 	UpdateConfigFile();
 }
 
 void ConfigManager::ParseConfig_Main()
 {
-	m_configMain.EnablePassthough = m_iniData.GetBoolValue("Main", "EnablePassthough", m_configMain.EnablePassthough);
+	m_configMain.EnablePassthoughOnLaunch = m_iniData.GetBoolValue("Main", "EnablePassthoughOnLaunch", m_configMain.EnablePassthoughOnLaunch);
 	m_configMain.ShowTestImage = m_iniData.GetBoolValue("Main", "ShowTestImage", m_configMain.ShowTestImage);
 	m_configMain.PassthroughOpacity = (float)m_iniData.GetDoubleValue("Main", "PassthroughOpacity", m_configMain.PassthroughOpacity);
 	m_configMain.ProjectionDistanceFar = (float)m_iniData.GetDoubleValue("Main", "ProjectionDistanceFar", m_configMain.ProjectionDistanceFar);
@@ -80,32 +76,22 @@ void ConfigManager::ParseConfig_Main()
 	m_configMain.Contrast = (float)m_iniData.GetDoubleValue("Main", "Contrast", m_configMain.Contrast);
 	m_configMain.Saturation = (float)m_iniData.GetDoubleValue("Main", "Saturation", m_configMain.Saturation);
 
-	m_configMain.RequireSteamVRRuntime = m_iniData.GetBoolValue("Main", "RequireSteamVRRuntime", m_configMain.RequireSteamVRRuntime);
-}
+	m_configMain.PassthroughMode = (EPassthroughBlendMode)m_iniData.GetLongValue("Core", "PassthroughMode", m_configMain.PassthroughMode);
 
-void ConfigManager::ParseConfig_Core()
-{
-	m_configCore.CorePassthroughEnable = m_iniData.GetBoolValue("Core", "CorePassthroughEnable", m_configCore.CorePassthroughEnable);
-	m_configCore.CoreAlphaBlend = m_iniData.GetBoolValue("Core", "CoreAlphaBlend", m_configCore.CoreAlphaBlend);
-	m_configCore.CoreAdditive = m_iniData.GetBoolValue("Core", "CoreAdditive", m_configCore.CoreAdditive);
-	m_configCore.CorePreferredMode = (int)m_iniData.GetLongValue("Core", "CorePreferredMode", m_configCore.CorePreferredMode);
+	m_configMain.MaskedFractionChroma = (float)m_iniData.GetDoubleValue("Core", "MaskedFractionChroma", m_configMain.MaskedFractionChroma);
+	m_configMain.MaskedFractionLuma = (float)m_iniData.GetDoubleValue("Core", "MaskedFractionLuma", m_configMain.MaskedFractionLuma);
+	m_configMain.MaskedSmoothing = (float)m_iniData.GetDoubleValue("Core", "MaskedSmoothing", m_configMain.MaskedSmoothing);
 
-	m_configCore.CoreForcePassthrough = m_iniData.GetBoolValue("Core", "CoreForcePassthrough", m_configCore.CoreForcePassthrough);
-	m_configCore.CoreForceMode = (int)m_iniData.GetLongValue("Core", "CoreForceMode", m_configCore.CoreForceMode);
-	m_configCore.CoreForceMaskedFractionChroma = (float)m_iniData.GetDoubleValue("Core", "CoreForceMaskedFractionChroma", m_configCore.CoreForceMaskedFractionChroma);
-	m_configCore.CoreForceMaskedFractionLuma = (float)m_iniData.GetDoubleValue("Core", "CoreForceMaskedFractionLuma", m_configCore.CoreForceMaskedFractionLuma);
-	m_configCore.CoreForceMaskedSmoothing = (float)m_iniData.GetDoubleValue("Core", "CoreForceMaskedSmoothing", m_configCore.CoreForceMaskedSmoothing);
+	m_configMain.MaskedKeyColor[0] = (float)m_iniData.GetDoubleValue("Core", "MaskedKeyColorR", m_configMain.MaskedKeyColor[0]);
+	m_configMain.MaskedKeyColor[1] = (float)m_iniData.GetDoubleValue("Core", "MaskedKeyColorG", m_configMain.MaskedKeyColor[1]);
+	m_configMain.MaskedKeyColor[2] = (float)m_iniData.GetDoubleValue("Core", "MaskedKeyColorB", m_configMain.MaskedKeyColor[2]);
 
-	m_configCore.CoreForceMaskedKeyColor[0] = (float)m_iniData.GetDoubleValue("Core", "CoreForceMaskedKeyColorR", m_configCore.CoreForceMaskedKeyColor[0]);
-	m_configCore.CoreForceMaskedKeyColor[1] = (float)m_iniData.GetDoubleValue("Core", "CoreForceMaskedKeyColorG", m_configCore.CoreForceMaskedKeyColor[1]);
-	m_configCore.CoreForceMaskedKeyColor[2] = (float)m_iniData.GetDoubleValue("Core", "CoreForceMaskedKeyColorB", m_configCore.CoreForceMaskedKeyColor[2]);
-
-	m_configCore.CoreForceMaskedUseCameraImage = m_iniData.GetBoolValue("Core", "CoreForceMaskedUseCameraImage", m_configCore.CoreForceMaskedUseCameraImage);
+	m_configMain.MaskedUseCameraImage = m_iniData.GetBoolValue("Core", "MaskedUseCameraImage", m_configMain.MaskedUseCameraImage);
 }
 
 void ConfigManager::UpdateConfig_Main()
 {
-	m_iniData.SetBoolValue("Main", "EnablePassthough", m_configMain.EnablePassthough);
+	m_iniData.SetBoolValue("Main", "EnablePassthoughOnLaunch", m_configMain.EnablePassthoughOnLaunch);
 	m_iniData.SetBoolValue("Main", "ShowTestImage", m_configMain.ShowTestImage);
 	m_iniData.SetDoubleValue("Main", "PassthroughOpacity", m_configMain.PassthroughOpacity);
 	m_iniData.SetDoubleValue("Main", "ProjectionDistanceFar", m_configMain.ProjectionDistanceFar);
@@ -115,25 +101,14 @@ void ConfigManager::UpdateConfig_Main()
 	m_iniData.SetDoubleValue("Main", "Contrast", m_configMain.Contrast);
 	m_iniData.SetDoubleValue("Main", "Saturation", m_configMain.Saturation);
 
-	m_iniData.SetBoolValue("Main", "RequireSteamVRRuntime", m_configMain.RequireSteamVRRuntime);
-}
+	m_iniData.SetLongValue("Core", "PassthroughMode", (int)m_configMain.PassthroughMode);
+	m_iniData.SetDoubleValue("Core", "MaskedFractionChroma", m_configMain.MaskedFractionChroma);
+	m_iniData.SetDoubleValue("Core", "MaskedFractionLuma", m_configMain.MaskedFractionLuma);
+	m_iniData.SetDoubleValue("Core", "MaskedSmoothing", m_configMain.MaskedSmoothing);
 
-void ConfigManager::UpdateConfig_Core()
-{
-	m_iniData.SetBoolValue("Core", "CorePassthroughEnable", m_configCore.CorePassthroughEnable);
-	m_iniData.SetBoolValue("Core", "CoreAlphaBlend", m_configCore.CoreAlphaBlend);
-	m_iniData.SetBoolValue("Core", "CoreAdditive", m_configCore.CoreAdditive);
-	m_iniData.SetLongValue("Core", "CorePreferredMode", m_configCore.CorePreferredMode);
+	m_iniData.SetDoubleValue("Core", "MaskedKeyColorR", m_configMain.MaskedKeyColor[0]);
+	m_iniData.SetDoubleValue("Core", "MaskedKeyColorG", m_configMain.MaskedKeyColor[1]);
+	m_iniData.SetDoubleValue("Core", "MaskedKeyColorB", m_configMain.MaskedKeyColor[2]);
 
-	m_iniData.SetBoolValue("Core", "CoreForcePassthrough", m_configCore.CoreForcePassthrough);
-	m_iniData.SetLongValue("Core", "CoreForceMode", m_configCore.CoreForceMode);
-	m_iniData.SetDoubleValue("Core", "CoreForceMaskedFractionChroma", m_configCore.CoreForceMaskedFractionChroma);
-	m_iniData.SetDoubleValue("Core", "CoreForceMaskedFractionLuma", m_configCore.CoreForceMaskedFractionLuma);
-	m_iniData.SetDoubleValue("Core", "CoreForceMaskedSmoothing", m_configCore.CoreForceMaskedSmoothing);
-
-	m_iniData.SetDoubleValue("Core", "CoreForceMaskedKeyColorR", m_configCore.CoreForceMaskedKeyColor[0]);
-	m_iniData.SetDoubleValue("Core", "CoreForceMaskedKeyColorG", m_configCore.CoreForceMaskedKeyColor[1]);
-	m_iniData.SetDoubleValue("Core", "CoreForceMaskedKeyColorB", m_configCore.CoreForceMaskedKeyColor[2]);
-
-	m_iniData.SetBoolValue("Core", "CoreForceMaskedUseCameraImage", m_configCore.CoreForceMaskedUseCameraImage);
+	m_iniData.SetBoolValue("Core", "MaskedUseCameraImage", m_configMain.MaskedUseCameraImage);
 }
